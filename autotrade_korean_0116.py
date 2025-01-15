@@ -819,7 +819,7 @@ def trading_bot():
                 trade_signal['signal'],
                 market_data
             )    
-            )
+            
             
             # 거래 결과 처리
             if trade_result:
