@@ -705,7 +705,6 @@ def execute_sell(percentage, market_data):
 
 
 ## 수정
-
 def calculate_profit_loss(entry_price, current_price, trade_type='buy'):
     """수익률 계산"""
     try:
@@ -739,6 +738,41 @@ def calculate_profit_loss(entry_price, current_price, trade_type='buy'):
     except Exception as e:
         logger.error(f"수익률 계산 중 오류 발생: {str(e)}")
         return 0.0
+
+        
+# def calculate_profit_loss(entry_price, current_price, trade_type='buy'):
+#     """수익률 계산"""
+#     try:
+#         # 기본 유효성 검사
+#         if not entry_price or not current_price:
+#             logger.error(f"수익률 계산 오류: 가격 데이터 누락 (entry_price: {entry_price}, current_price: {current_price})")
+#             return 0.0
+        
+#         # 0으로 나누기 방지
+#         if float(entry_price) <= 0:
+#             logger.error(f"수익률 계산 오류: 진입 가격이 0이하 (entry_price: {entry_price})")
+#             return 0.0
+
+#         # 숫자형으로 변환
+#         entry_price = float(entry_price)
+#         current_price = float(current_price)
+        
+#         # 수익률 계산
+#         if trade_type.lower() == 'buy':
+#             profit_percentage = ((current_price - entry_price) / entry_price) * 100
+#         else:  # sell의 경우 반대로 계산
+#             profit_percentage = ((entry_price - current_price) / current_price) * 100
+        
+#         # 비정상적인 수익률 체크 (500%로 상향 조정)
+#         if abs(profit_percentage) > 500:
+#             logger.warning(f"높은 수익률 감지: {profit_percentage:.2f}% (entry: {entry_price:,.0f}, current: {current_price:,.0f})")
+            
+#         # 소수점 2자리까지 반올림
+#         return round(profit_percentage, 2)
+
+#     except Exception as e:
+#         logger.error(f"수익률 계산 중 오류 발생: {str(e)}")
+#         return 0.0
 
         
 # def calculate_profit_loss(entry_price, current_price, trade_type='buy'):
