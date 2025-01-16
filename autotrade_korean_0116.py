@@ -64,6 +64,7 @@ def send_discord_message(msg):
     except Exception as e:
         logger.error(f"Discord 메시지 전송 실패: {e}")
 
+
 # API 키 검증
 access = os.getenv("UPBIT_ACCESS_KEY")
 secret = os.getenv("UPBIT_SECRET_KEY")
@@ -162,6 +163,7 @@ def log_trade(conn, trade_data):
     except Exception as e:
         conn.rollback()  ## 추가된 부분
         logger.error(f"거래 기록 중 오류: {e}")
+
 
 def update_trading_state(conn, state_data):
     """트레이딩 상태 업데이트 함수"""
@@ -427,59 +429,59 @@ def get_gpt_trade_percentage(market_data, signal):
         logger.error(f"GPT 거래 비중 문의 중 오류: {e}")
         return {'percentage': 10, 'reason': '기본 거래 비중 적용 (오류 발생)'}
 
-#거래 비중 문의의
-def get_gpt_trade_percentage(market_data, signal):
-    """GPT에게 거래 비중 문의"""
-    try:
-        messages = [
-            {
-                "role": "system",
-                "content": """비트코인 트레이딩 전문가로서 현재 시장 상황을 분석하고 
-                적절한 거래 비중(0~30%)을 제안해주세요. 반드시 아래 JSON 형식으로만 응답하세요:
-                {"percentage": 15, "reason": "거래 비중 선택 이유"}"""
-            },
-            {
-                "role": "user",
-                "content": f"""
-                현재 시장 상황:
-                - 거래 유형: {signal.upper()}
-                - 현재가: {market_data['current_price']:,.0f}원
-                - RSI: {market_data['rsi']:.2f}
-                - BB Width: {market_data['bb_width']:.2f}%
-                - MACD: {market_data['macd']:.2f}
-                - 추세: {market_data['trend']}
+#거래 비중 문의
+# def get_gpt_trade_percentage(market_data, signal):
+#     """GPT에게 거래 비중 문의"""
+#     try:
+#         messages = [
+#             {
+#                 "role": "system",
+#                 "content": """비트코인 트레이딩 전문가로서 현재 시장 상황을 분석하고 
+#                 적절한 거래 비중(0~30%)을 제안해주세요. 반드시 아래 JSON 형식으로만 응답하세요:
+#                 {"percentage": 15, "reason": "거래 비중 선택 이유"}"""
+#             },
+#             {
+#                 "role": "user",
+#                 "content": f"""
+#                 현재 시장 상황:
+#                 - 거래 유형: {signal.upper()}
+#                 - 현재가: {market_data['current_price']:,.0f}원
+#                 - RSI: {market_data['rsi']:.2f}
+#                 - BB Width: {market_data['bb_width']:.2f}%
+#                 - MACD: {market_data['macd']:.2f}
+#                 - 추세: {market_data['trend']}
                 
-                위 데이터를 기반으로 0~30% 사이의 적절한 거래 비중을 제안해주세요.
-                극단적인 RSI나 명확한 매수/매도 시그널이 있을 때는 더 높은 비중을,
-                불확실성이 높을 때는 더 낮은 비중을 제안해주세요.
-                """
-            }
-        ]
+#                 위 데이터를 기반으로 0~30% 사이의 적절한 거래 비중을 제안해주세요.
+#                 극단적인 RSI나 명확한 매수/매도 시그널이 있을 때는 더 높은 비중을,
+#                 불확실성이 높을 때는 더 낮은 비중을 제안해주세요.
+#                 """
+#             }
+#         ]
 
-        response = openai_client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            max_tokens=200,
-            temperature=0.7
-        )
+#         response = openai_client.chat.completions.create(
+#             model="gpt-4",
+#             messages=messages,
+#             max_tokens=200,
+#             temperature=0.7
+#         )
 
-        result = json.loads(response.choices[0].message.content.strip())
+#         result = json.loads(response.choices[0].message.content.strip())
         
-        # 거래 비중 범위 제한
-        percentage = min(max(result.get('percentage', 10), 
-                           TRADING_CONFIG['MIN_TRADE_PERCENTAGE']), 
-                           TRADING_CONFIG['MAX_TRADE_PERCENTAGE'])
+#         # 거래 비중 범위 제한
+#         percentage = min(max(result.get('percentage', 10), 
+#                            TRADING_CONFIG['MIN_TRADE_PERCENTAGE']), 
+#                            TRADING_CONFIG['MAX_TRADE_PERCENTAGE'])
         
-        logger.info(f"GPT 거래 비중 제안: {percentage}% ({result.get('reason', '')})")
+#         logger.info(f"GPT 거래 비중 제안: {percentage}% ({result.get('reason', '')})")
         
-        return {
-            'percentage': percentage,
-            'reason': result.get('reason', '기본 거래 비중 적용')
-        }
+#         return {
+#             'percentage': percentage,
+#             'reason': result.get('reason', '기본 거래 비중 적용')
+#         }
         
-    except Exception as e:
-        logger.error(f"GPT 거래 비중 문의 중 오류: {e}")
-        return {'percentage': 10, 'reason': '기본 거래 비중 적용 (오류 발생)'}
+#     except Exception as e:
+#         logger.error(f"GPT 거래 비중 문의 중 오류: {e}")
+#         return {'percentage': 10, 'reason': '기본 거래 비중 적용 (오류 발생)'}
     
 ##4파트
 
@@ -703,29 +705,67 @@ def execute_sell(percentage, market_data):
 
 
 ## 수정
+
 def calculate_profit_loss(entry_price, current_price, trade_type='buy'):
     """수익률 계산"""
     try:
-        if not entry_price or not current_price or entry_price == 0:
-            logger.error(f"수익률 계산 오류: 잘못된 가격 데이터 (entry_price: {entry_price}, current_price: {current_price})")
+        # 기본 유효성 검사
+        if not entry_price or not current_price:
+            logger.error(f"수익률 계산 오류: 가격 데이터 누락 (entry_price: {entry_price}, current_price: {current_price})")
+            return 0.0
+        
+        # 0으로 나누기 방지
+        if float(entry_price) <= 0:
+            logger.error(f"수익률 계산 오류: 진입 가격이 0이하 (entry_price: {entry_price})")
             return 0.0
 
-        if trade_type == 'buy':
+        # 숫자형으로 변환
+        entry_price = float(entry_price)
+        current_price = float(current_price)
+        
+        # 수익률 계산
+        if trade_type.lower() == 'buy':
             profit_percentage = ((current_price - entry_price) / entry_price) * 100
-        else:  # sell
-            profit_percentage = ((entry_price - current_price) / entry_price) * 100
-
-        # 비정상적인 수익률 체크
-        if abs(profit_percentage) > 100:  # 100% 이상의 수익률은 오류로 간주
-            logger.error(f"비정상적인 수익률 감지: {profit_percentage}% (entry: {entry_price}, current: {current_price})")
-            return 0.0
-
-        return profit_percentage
+        else:  # sell의 경우 반대로 계산
+            profit_percentage = ((entry_price - current_price) / current_price) * 100
+        
+        # 비정상적인 수익률 체크 (500%로 상향 조정)
+        if abs(profit_percentage) > 500:
+            logger.warning(f"높은 수익률 감지: {profit_percentage:.2f}% (entry: {entry_price:,.0f}, current: {current_price:,.0f})")
+            
+        # 소수점 2자리까지 반올림
+        return round(profit_percentage, 2)
 
     except Exception as e:
-        logger.error(f"수익률 계산 중 오류: {e}")
+        logger.error(f"수익률 계산 중 오류 발생: {str(e)}")
         return 0.0
+
+        
+# def calculate_profit_loss(entry_price, current_price, trade_type='buy'):
+#     """수익률 계산"""
+#     try:
+#         if not entry_price or not current_price or entry_price == 0:
+#             logger.error(f"수익률 계산 오류: 잘못된 가격 데이터 (entry_price: {entry_price}, current_price: {current_price})")
+#             return 0.0
+
+#         if trade_type == 'buy':
+#             profit_percentage = ((current_price - entry_price) / entry_price) * 100
+#         else:  # sell
+#             profit_percentage = ((entry_price - current_price) / entry_price) * 100
+
+#         # 비정상적인 수익률 체크
+#         if abs(profit_percentage) > 100:  # 100% 이상의 수익률은 오류로 간주
+#             logger.error(f"비정상적인 수익률 감지: {profit_percentage}% (entry: {entry_price}, current: {current_price})")
+#             return 0.0
+
+#         return profit_percentage
+
+#     except Exception as e:
+#         logger.error(f"수익률 계산 중 오류: {e}")
+#         return 0.0
     
+
+
 # def calculate_profit_loss(entry_price, current_price, trade_type='buy'):
 #     """수익률 계산"""
 #     try:
