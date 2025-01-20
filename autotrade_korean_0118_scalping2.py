@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 TRADING_CONFIG = {
     'MAX_TRADE_PERCENTAGE': 30.0,    # 최대 거래 비중
     'MIN_TRADE_PERCENTAGE': 5.0,     # 최소 거래 비중
-    'RSI_OVERSOLD': 30,             # RSI 과매도
-    'RSI_OVERBOUGHT': 70,           # RSI 과매수
+    'RSI_OVERSOLD': 28,             # RSI 과매도
+    'RSI_OVERBOUGHT': 68,           # RSI 과매수
     'STOCH_RSI_OVERSOLD': 20,       # Stochastic RSI 과매도
     'STOCH_RSI_OVERBOUGHT': 80,     # Stochastic RSI 과매수
     'TRADING_INTERVAL': 5,          # 거래 주기 (분)
@@ -51,13 +51,14 @@ class FastTradingBot:
     def init_database(self):
         """데이터베이스 초기화"""
         conn = sqlite3.connect('bitcoin_trades.db')
-        cursor = conn.cursor()
+        cursor = conn.cursor() #추가
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS trades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT,
                 decision TEXT,
                 percentage REAL,
+                btc_balance REAL,      
                 price REAL,
                 reason TEXT,
                 rsi REAL,
@@ -174,6 +175,9 @@ class FastTradingBot:
                     
                     위 데이터를 기반으로 매수/매도/홀드 결정과 
                     0~30% 사이의 적절한 거래 비중을 제안해주세요.
+                    단 RSI는 68미만, 28이상일 경우는 홀드 결정을 
+                    Stochastic RSI가 0.80이상, 0.20미만일 경우에도 홀드 결정을
+                    해주세요. 
                     """
                 }
             ]
@@ -200,18 +204,18 @@ class FastTradingBot:
             logger.error(f"GPT 결정 요청 중 오류: {e}")
             return None
 
-    def execute_trade(self, decision, market_data):
-        """거래 실행"""
-        try:
-            if decision['decision'] == 'buy':
-                return self.execute_buy(decision['percentage'], market_data, decision['reason'])
-            elif decision['decision'] == 'sell':
-                return self.execute_sell(decision['percentage'], market_data, decision['reason'])
-            return None
+    # def execute_trade(self, decision, market_data):
+    #     """거래 실행"""
+    #     try:
+    #         if decision['decision'] == 'buy':
+    #             return self.execute_buy(decision['percentage'], market_data, decision['reason'])
+    #         elif decision['decision'] == 'sell':
+    #             return self.execute_sell(decision['percentage'], market_data, decision['reason'])
+    #         return None
             
-        except Exception as e:
-            logger.error(f"거래 실행 중 오류: {e}")
-            return None
+    #     except Exception as e:
+    #         logger.error(f"거래 실행 중 오류: {e}")
+    #         return None
 
     def execute_buy(self, percentage, market_data, reason):
         """매수 실행"""
