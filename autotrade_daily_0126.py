@@ -611,49 +611,33 @@ def trading_bot():
         if conn:
             conn.close()
 
-
 def main():
     """메인 실행 함수"""
     try:
-        # 거래 방식 선택
-        print("\n=== 비트코인 트레이딩 봇 설정 ===")
-        print("1. 정해진 시간 실행 (06:00, 12:00, 18:00, 00:00)")
-        print("2. 주기적 실행 (10분 또는 30분 간격)")
-        mode = input("실행 방식을 선택하세요 (1 또는 2): ")
-        
-        if mode == "2":
-            interval = input("실행 간격을 선택하세요 (10,20 또는 30분): ")
-            if interval not in ["10","20","30"]:   #10,20,30
-                raise ValueError("잘못된 간격이 선택되었습니다.")
+        mode = os.getenv("TRADING_MODE", "1")
+        interval = int(os.getenv("TRADING_INTERVAL", "30"))
                 
-        # 시작 메시지
         start_message = (
             "🚀 비트코인 트레이딩 봇 시작\n"
             f"• 실행 방식: {'정해진 시간' if mode == '1' else f'{interval}분 간격'}\n"
-            f"• Stochastic RSI 범위: {TRADING_CONFIG['STOCH_RSI_LOWER']} - {TRADING_CONFIG['STOCH_RSI_UPPER']}\n"
-            f"• RSI 범위: {TRADING_CONFIG['RSI_LOWER_BOUND']} - {TRADING_CONFIG['RSI_UPPER_BOUND']}\n"
-            f"• Volume OSC 임계값: {TRADING_CONFIG['VO_THRESHOLD']}"
+            f"• Stochastic RSI: {TRADING_CONFIG['STOCH_RSI_LOWER']} - {TRADING_CONFIG['STOCH_RSI_UPPER']}\n"
+            f"• RSI: {TRADING_CONFIG['RSI_LOWER_BOUND']} - {TRADING_CONFIG['RSI_UPPER_BOUND']}\n"
+            f"• Volume OSC: {TRADING_CONFIG['VO_THRESHOLD']}"
         )
         send_discord_message(start_message)
         
         if mode == "1":
-            # 하루 4번 실행 스케줄 설정
             schedule.every().day.at("06:00").do(trading_bot)
             schedule.every().day.at("12:00").do(trading_bot)
             schedule.every().day.at("18:00").do(trading_bot)
             schedule.every().day.at("00:00").do(trading_bot)
+            logger.info("정해진 시간 실행 모드 (06:00, 12:00, 18:00, 00:00)")
         else:
-            # 주기적 실행 설정
-            if interval == "10":
-                schedule.every(10).minutes.do(trading_bot)
-            if interval == "20":
-                schedule.every(20).minutes.do(trading_bot) 
-            else:  # interval == "30"
-                schedule.every(30).minutes.do(trading_bot)
+            schedule.every(interval).minutes.do(trading_bot)
+            logger.info(f"{interval}분 간격 실행 모드")
         
         logger.info("트레이딩 스케줄 설정 완료")
         
-        # 메인 루프
         while True:
             try:
                 schedule.run_pending()
@@ -672,6 +656,69 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+# def main():
+#     """메인 실행 함수"""
+#     try:
+#         # 거래 방식 선택
+#         print("\n=== 비트코인 트레이딩 봇 설정 ===")
+#         print("1. 정해진 시간 실행 (06:00, 12:00, 18:00, 00:00)")
+#         print("2. 주기적 실행 (10분 또는 30분 간격)")
+#         mode = input("실행 방식을 선택하세요 (1 또는 2): ")
+        
+#         if mode == "2":
+#             interval = input("실행 간격을 선택하세요 (10,20 또는 30분): ")
+#             if interval not in ["10","20","30"]:   #10,20,30
+#                 raise ValueError("잘못된 간격이 선택되었습니다.")
+                
+#         # 시작 메시지
+#         start_message = (
+#             "🚀 비트코인 트레이딩 봇 시작\n"
+#             f"• 실행 방식: {'정해진 시간' if mode == '1' else f'{interval}분 간격'}\n"
+#             f"• Stochastic RSI 범위: {TRADING_CONFIG['STOCH_RSI_LOWER']} - {TRADING_CONFIG['STOCH_RSI_UPPER']}\n"
+#             f"• RSI 범위: {TRADING_CONFIG['RSI_LOWER_BOUND']} - {TRADING_CONFIG['RSI_UPPER_BOUND']}\n"
+#             f"• Volume OSC 임계값: {TRADING_CONFIG['VO_THRESHOLD']}"
+#         )
+#         send_discord_message(start_message)
+        
+#         if mode == "1":
+#             # 하루 4번 실행 스케줄 설정
+#             schedule.every().day.at("06:00").do(trading_bot)
+#             schedule.every().day.at("12:00").do(trading_bot)
+#             schedule.every().day.at("18:00").do(trading_bot)
+#             schedule.every().day.at("00:00").do(trading_bot)
+#         else:
+#             # 주기적 실행 설정
+#             if interval == "10":
+#                 schedule.every(10).minutes.do(trading_bot)
+#             if interval == "20":
+#                 schedule.every(20).minutes.do(trading_bot) 
+#             else:  # interval == "30"
+#                 schedule.every(30).minutes.do(trading_bot)
+        
+#         logger.info("트레이딩 스케줄 설정 완료")
+        
+#         # 메인 루프
+#         while True:
+#             try:
+#                 schedule.run_pending()
+#                 time.sleep(1)
+#             except KeyboardInterrupt:
+#                 send_discord_message("🛑 트레이딩 봇 종료")
+#                 break
+#             except Exception as e:
+#                 logger.error(f"메인 루프 오류: {e}")
+#                 send_discord_message(f"🚨 메인 루프 오류: {e}")
+#                 time.sleep(60)
+                
+#     except Exception as e:
+#         logger.error(f"프로그램 시작 중 오류: {e}")
+#         send_discord_message(f"🚨 프로그램 시작 오류: {e}")
+
+# if __name__ == "__main__":
+#     main()
 
 # def main():
 #     """메인 실행 함수"""
