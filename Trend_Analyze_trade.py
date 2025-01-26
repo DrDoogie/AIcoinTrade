@@ -1,3 +1,5 @@
+## Trend Analyzer
+
 import sqlite3
 import logging
 import plotly.graph_objects as go
