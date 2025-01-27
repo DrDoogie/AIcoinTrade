@@ -57,11 +57,13 @@ def create_driver():
         raise
 
 # 스크린샷 저장 디렉토리 생성
-def ensure_screenshot_dir():
-    screenshot_dir = 'screenshots'
-    if not os.path.exists(screenshot_dir):
-        os.makedirs(screenshot_dir)
-    return screenshot_dir
+# def ensure_screenshot_dir():
+#     screenshot_dir = 'screenshots'
+#     if not os.path.exists(screenshot_dir):
+#         os.makedirs(screenshot_dir)
+#     return screenshot_dir
+
+
 
 def click_element_by_xpath(driver, xpath, element_name, wait_time=10):
     try:
@@ -133,20 +135,33 @@ def add_technical_indicators(driver):
         logger.error(f"기술적 지표 추가 중 오류 발생: {e}")
         raise
 
+
 def capture_full_page_screenshot(driver, filename):
     try:
         logger.info("전체 페이지 스크린샷 촬영 준비 중...")
         time.sleep(2)  # 최종 차트 로딩을 위한 대기
         
-        screenshot_dir = ensure_screenshot_dir()
-        screenshot_path = os.path.join(screenshot_dir, filename)
-        
         logger.info("전체 페이지 스크린샷 촬영 중...")
-        driver.save_screenshot(screenshot_path)
-        logger.info(f"스크린샷이 성공적으로 저장되었습니다: {screenshot_path}")
+        driver.save_screenshot(filename)
+        logger.info(f"스크린샷이 성공적으로 저장되었습니다: {filename}")
     except Exception as e:
         logger.error(f"스크린샷 촬영 중 오류 발생: {e}")
         raise
+    
+# def capture_full_page_screenshot(driver, filename):
+#     try:
+#         logger.info("전체 페이지 스크린샷 촬영 준비 중...")
+#         time.sleep(2)  # 최종 차트 로딩을 위한 대기
+        
+#         screenshot_dir = ensure_screenshot_dir()
+#         screenshot_path = os.path.join(screenshot_dir, filename)
+        
+#         logger.info("전체 페이지 스크린샷 촬영 중...")
+#         driver.save_screenshot(screenshot_path)
+#         logger.info(f"스크린샷이 성공적으로 저장되었습니다: {screenshot_path}")
+#     except Exception as e:
+#         logger.error(f"스크린샷 촬영 중 오류 발생: {e}")
+#         raise
 
 def setup_upbit_chart(url, screenshot_filename="Upbit.png"):
     driver = None
