@@ -90,15 +90,22 @@ def wait_for_market_open():
     send_message("미국 시장이 닫혀 있습니다. 개장까지 대기합니다...")
     
     while not is_market_time():
+        # ✅ 16시 이후 또는 00시~08시까지는 60분 단위 대기
         nas_time = datetime.now(timezone('America/New_York'))
-        next_check = 5 if nas_time.hour >= 9 else 60  # 개장 시간 근처면 더 자주 체크
+        if nas_time.hour >= 16 or nas_time.hour < 9:
+            next_check = 60
+        else:
+            next_check = 5  # ✅ 09시 이후부터 개장 전(09:30 전)까지는 5분 단위 대기
         send_message(f"다음 확인까지 {next_check}분 대기...")
+
+        #next_check = 5 if nas_time.hour >= 9 else 60  # 개장 시간 근처면 더 자주 체크
         time.sleep(next_check * 60)
     send_message("미국 시장이 개장되었습니다!")
     refresh_token()  # 시장 개장 시 토큰 갱신
 
+
 #분봉 데이터 가져오기기
-def get_minute_data(nmin=30, period=5, access_token=""):
+def get_minute_data(nmin=30, period=2, access_token=""):  #period=5 -> 2
     """분봉 데이터 조회 (전역 변수 사용)"""
     print(f"분봉 데이터 조회 시작 - 종목: {SYMBOL}, 시간간격: {nmin}분")
     PATH = "/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
@@ -281,20 +288,7 @@ def get_balance():
         "OVRS_ORD_UNPR": str(get_current_price()) # ✅ 현재가를 조회하여 입력 #
         
         }
-    # params = {
-    #     "CANO": CANO,
-    #     "ACNT_PRDT_CD": ACNT_PRDT_CD,
-    #     "ITEM_CD": SYMBOL,
-    #     "OVRS_ORD_UNPR": "0", #str(current_price), 시장가입력🔹 가격을 조회 후 설정
-    #     "OVRS_EXCG_CD": MARKET
-    # }
-    # "input": {
-    #         "ACNT_PRDT_CD": "01",
-    #         "CANO": "81019777",
-    #         "ITEM_CD": "00011",
-    #         "OVRS_EXCG_CD": "SEHK",
-    #         "OVRS_ORD_UNPR": "133.200"
-    #     }
+    
 
     res = requests.get(URL, headers=headers, params=params)
     res_data = res.json()
@@ -577,9 +571,11 @@ def main():
             
             # RSI 체크 조건
             minutes_elapsed = (current_time - last_check_time).total_seconds() / 60
-            time_to_check = (NAS_time.minute % 30 == 0 or (NAS_time.minute % 30 == 1 and NAS_time.second <= 30))
+            time_to_check = (NAS_time.minute % 20 == 0 or (NAS_time.minute % 20 == 1 and NAS_time.second <= 30))
+            #time_to_check = (NAS_time.minute % 30 == 0 or (NAS_time.minute % 30 == 1 and NAS_time.second <= 30))
             
-            if force_first_check or (minutes_elapsed >= 29 and time_to_check):
+            if force_first_check or (minutes_elapsed >= 19 and time_to_check):  # ✅ 20분 단위 실행
+            #if force_first_check or (minutes_elapsed >= 29 and time_to_check):
                 # 시장 상태 확인
                 market_open = is_market_time()
                 if not market_open:
@@ -587,6 +583,7 @@ def main():
                     last_check_time = current_time
                     force_first_check = False
                     continue
+                
                 
                 # RSI 체크 및 매매 로직
                 KST_time = datetime.now(timezone('Asia/Seoul'))
@@ -624,7 +621,7 @@ def main():
                                 total_cost = qty * current_price
                                 
                                 # 상세 정보 출력
-                                send_message(f"🛒 매수 시도 정보:")
+                                #send_message(f"🛒 매수 시도 정보:")
                                 send_message(f"- 매수 가능 금액: ${available_usd:.2f}")
                                 send_message(f"- 주문 수량: {qty}주")
                                 send_message(f"- 주문 가격: ${current_price:.2f}")
@@ -660,17 +657,23 @@ def main():
                 force_first_check = False
                 
                 # 다음 체크 시간 계산
+                # 다음 RSI 체크까지 남은 시간 계산
                 next_check_minutes = 30 - (NAS_time.minute % 30)
                 if next_check_minutes == 0:
                     next_check_minutes = 30
                 send_message(f"⏳ 다음 RSI 체크까지 약 {next_check_minutes}분 남았습니다")
-            
+                
+                # 정확히 다음 RSI 체크까지 대기
+                time.sleep(next_check_minutes * 60)
+
             # 장 마감 체크
-            if NAS_time.hour >= 16:s
+            if NAS_time.hour >= 16:
                 send_message("📉 미국 장 마감으로 프로그램을 종료합니다.")
-                break
+                wait_for_market_open()  # ✅ 장 마감 후 시장이 열릴 때까지 대기
+                continue  # 다음 루프 실행
+                #break
             
-            time.sleep(30)  # 30초마다 체크
+            # time.sleep(300)  # 30초마다 체크
     
     except Exception as e:
         send_message(f"🚨 [오류 발생]{str(e)}")
