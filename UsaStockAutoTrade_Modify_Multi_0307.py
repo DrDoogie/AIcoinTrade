@@ -101,14 +101,152 @@ def wait_for_market_open():
     send_message("미국 시장이 개장되었습니다!")
     refresh_token()  # 시장 개장 시 토큰 갱신
 
+
 #2파트
+
+def get_minute_data(symbol, nmin=30, period=2, access_token=""):
+    """분봉 데이터 조회 (다중 심볼 대응)"""
+    print(f"분봉 데이터 조회 시작 - 종목: {symbol}, 시간간격: {nmin}분")
+    PATH = "/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
+    URL = f"{URL_BASE}/{PATH}"
+    
+    # 각 종목별 시장 정보 매핑
+    MARKET_MAP = {
+        "PLTR": {"EXCD": "NAS", "MARKET": "NASD"},
+        "NVDA": {"EXCD": "NAS", "MARKET": "NASD"},
+        "TSLA": {"EXCD": "NAS", "MARKET": "NASD"}
+    }
+    
+    # 해당 심볼의 거래소 정보 가져오기
+    market_info = MARKET_MAP.get(symbol, {"EXCD": EXCD_MARKET, "MARKET": MARKET})
+    
+    all_data = []
+    next_key = ""
+    for _ in range(period):
+        params = {
+            "AUTH": "",
+            "EXCD": market_info["EXCD"],
+            "SYMB": symbol,
+            "NMIN": str(nmin),
+            "PINC": "1",
+            "NEXT": next_key,
+            "NREC": "120",
+            "FILL": "Y"
+        }
+     
+        headers = {
+            'content-type': 'application/json',
+            'authorization': f'Bearer {access_token}',
+            'appkey': APP_KEY,
+            'appsecret': APP_SECRET,
+            'tr_id': 'HHDFS76950200'
+        }
+        
+        res = requests.get(URL, headers=headers, params=params)
+        if res.status_code == 200:
+            data = res.json()
+            if "output2" in data and data["output2"]:
+                all_data.extend(data["output2"])
+                next_key = data.get("output1", {}).get("next", "")
+                if not next_key:
+                    break
+            else:
+                print(f"데이터 없음 - 요청 코드: {symbol}, 거래소: {market_info['MARKET']}")
+                break
+        else:
+            print(f"API 호출 실패. 상태 코드: {res.status_code}, 응답 내용: {res.text}")
+            break
+        time.sleep(0.5)
+    
+    print(f"{symbol} 조회된 데이터 수: {len(all_data)}")
+    return {"output2": all_data} if all_data else None
+
+def calculate_rsi(data, periods=14):
+    """RSI 계산 (다중 심볼 대응 개선 버전)"""
+    try:
+        # 데이터 유효성 확인
+        if "output2" not in data or not data["output2"]:
+            print("RSI 계산을 위한 데이터가 부족합니다")
+            return 50
+
+        # 데이터프레임 생성
+        df = pd.DataFrame(data["output2"])
+        print(f"RSI 계산을 위한 데이터 프레임 생성 완료: {len(df)} 행")
+        
+        # 가격 컬럼 동적 탐색
+        price_columns = ['stck_prpr', 'ovrs_nmix_prpr', 'close', 'last']
+        price_col = next((col for col in price_columns if col in df.columns), None)
+        
+        if not price_col:
+            print("가격 데이터 컬럼을 찾을 수 없습니다:", df.columns)
+            return 50
+        
+        # 가격 데이터 숫자 변환 및 결측값 처리
+        df['price'] = pd.to_numeric(df[price_col], errors='coerce')
+        df = df.dropna(subset=['price'])
+        
+        # 날짜/시간 컬럼 처리
+        if 'xymd' in df.columns and 'xhms' in df.columns:
+            df['datetime'] = pd.to_datetime(df['xymd'] + df['xhms'], format='%Y%m%d%H%M%S')
+        else:
+            print("datetime 컬럼 생성 실패")
+            return 50
+        
+        # 데이터 정렬
+        df = df.sort_values(by='datetime').reset_index(drop=True)
+        
+        # 데이터 충분성 확인
+        if len(df) < periods:
+            print(f"데이터 부족 (필요: {periods}, 현재: {len(df)})")
+            return 50
+        
+        # RSI 계산 로직
+        delta = df['price'].diff()
+        gain = (delta.where(delta > 0, 0)).fillna(0)
+        loss = (-delta.where(delta < 0, 0)).fillna(0)
+        
+        avg_gain = gain.rolling(window=periods, min_periods=periods).mean()
+        avg_loss = loss.rolling(window=periods, min_periods=periods).mean()
+        
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        
+        # 최신 RSI 값 추출 및 반올림
+        latest_rsi = round(rsi.iloc[-1], 2)
+        print(f"RSI 계산 완료: {latest_rsi}")
+        return latest_rsi
+    
+    except Exception as e:
+        print(f"RSI 계산 중 오류 발생: {e}")
+        return 50
+
+# 다중 심볼 RSI 조회 헬퍼 함수 (선택사항)
 def get_current_rsi(symbol, periods=14, nmin=30):
-    """현재 RSI 조회 (심볼 인자 추가)"""
+    """현재 RSI 조회 (다중 심볼 대응)"""
     print(f"RSI 조회 시작: {symbol}")
-    data = get_minute_data(symbol=symbol, nmin=nmin, access_token=ACCESS_TOKEN)
-    rsi_value = calculate_rsi(data, periods)
-    print(f"종목 {symbol}의 RSI 값: {rsi_value}")
-    return rsi_value
+    try:
+        # 액세스 토큰 확인 및 갱신
+        global ACCESS_TOKEN
+        if not ACCESS_TOKEN:
+            ACCESS_TOKEN = get_access_token()
+        
+        # 분봉 데이터 조회
+        data = get_minute_data(
+            symbol=symbol, 
+            nmin=nmin, 
+            access_token=ACCESS_TOKEN
+        )
+        
+        # RSI 계산
+        rsi_value = calculate_rsi(data, periods)
+        
+        print(f"종목 {symbol}의 RSI 값: {rsi_value}")
+        return rsi_value
+    
+    except Exception as e:
+        print(f"{symbol} RSI 조회 중 오류: {e}")
+        return 50
+
 
 def get_current_price(symbol, market=MARKET):
     """현재가 조회 (심볼 인자 추가)"""
