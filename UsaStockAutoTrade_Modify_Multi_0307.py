@@ -24,7 +24,7 @@ URL_BASE = _cfg['URL_BASE']
 # 거래소와 종목 전역 변수 설정
 MARKET = "NASD"  # 나스닥
 EXCD_MARKET = "NAS"
-SYMBOLS = ["PLTR", "NVDA","TSLA"]  # 여러 심볼 추가
+SYMBOLS = ["PLTR", "NVDA","TSLA","IONQ"]  # 여러 심볼 추가
 
 def send_message(msg, symbol=None):
     """디스코드 메세지 전송 (심볼 정보 추가)"""
@@ -114,7 +114,8 @@ def get_minute_data(symbol, nmin=30, period=2, access_token=""):
     MARKET_MAP = {
         "PLTR": {"EXCD": "NAS", "MARKET": "NASD"},
         "NVDA": {"EXCD": "NAS", "MARKET": "NASD"},
-        "TSLA": {"EXCD": "NAS", "MARKET": "NASD"}
+        "TSLA": {"EXCD": "NAS", "MARKET": "NASD"},
+        "IONQ": {"EXCD": "NYS", "MARKET": "NYSE"}
     }
     
     # 해당 심볼의 거래소 정보 가져오기
@@ -162,7 +163,7 @@ def get_minute_data(symbol, nmin=30, period=2, access_token=""):
     return {"output2": all_data} if all_data else None
 
 def calculate_rsi(data, periods=14):
-    """RSI 계산 (다중 심볼 대응 개선 버전)"""
+    """RSI 계산 (강화된 다중 심볼 대응 버전)"""
     try:
         # 데이터 유효성 확인
         if "output2" not in data or not data["output2"]:
@@ -173,24 +174,47 @@ def calculate_rsi(data, periods=14):
         df = pd.DataFrame(data["output2"])
         print(f"RSI 계산을 위한 데이터 프레임 생성 완료: {len(df)} 행")
         
-        # 가격 컬럼 동적 탐색
-        price_columns = ['stck_prpr', 'ovrs_nmix_prpr', 'close', 'last']
-        price_col = next((col for col in price_columns if col in df.columns), None)
+        # 가격 컬럼 동적 탐색 및 처리
+        price_columns = ['stck_prpr', 'ovrs_nmix_prpr', 'close', 'last', 'stck_clpr']
+        
+        # 가격 컬럼 찾기 및 데이터 정제
+        price_col = None
+        for col in price_columns:
+            if col in df.columns:
+                # 숫자가 아닌 값 제거, 빈 문자열 처리
+                df[col] = pd.to_numeric(df[col].replace('', np.nan), errors='coerce')
+                if not df[col].isnull().all():
+                    price_col = col
+                    break
         
         if not price_col:
             print("가격 데이터 컬럼을 찾을 수 없습니다:", df.columns)
             return 50
         
         # 가격 데이터 숫자 변환 및 결측값 처리
-        df['price'] = pd.to_numeric(df[price_col], errors='coerce')
+        df['price'] = df[price_col]
         df = df.dropna(subset=['price'])
         
         # 날짜/시간 컬럼 처리
-        if 'xymd' in df.columns and 'xhms' in df.columns:
-            df['datetime'] = pd.to_datetime(df['xymd'] + df['xhms'], format='%Y%m%d%H%M%S')
-        else:
+        datetime_cols = [
+            ('xymd', 'xhms', '%Y%m%d%H%M%S'),
+            ('date', 'time', '%Y-%m-%d %H:%M:%S')
+        ]
+        
+        datetime_col_found = False
+        for date_col, time_col, date_format in datetime_cols:
+            if date_col in df.columns and time_col in df.columns:
+                try:
+                    df['datetime'] = pd.to_datetime(df[date_col] + df[time_col], format=date_format)
+                    datetime_col_found = True
+                    break
+                except:
+                    continue
+        
+        if not datetime_col_found:
             print("datetime 컬럼 생성 실패")
-            return 50
+            # 인덱스를 datetime으로 사용
+            df['datetime'] = pd.date_range(end=pd.Timestamp.now(), periods=len(df))
         
         # 데이터 정렬
         df = df.sort_values(by='datetime').reset_index(drop=True)
@@ -219,6 +243,65 @@ def calculate_rsi(data, periods=14):
     except Exception as e:
         print(f"RSI 계산 중 오류 발생: {e}")
         return 50
+
+# def calculate_rsi(data, periods=14):
+#     """RSI 계산 (다중 심볼 대응 개선 버전)"""
+#     try:
+#         # 데이터 유효성 확인
+#         if "output2" not in data or not data["output2"]:
+#             print("RSI 계산을 위한 데이터가 부족합니다")
+#             return 50
+
+#         # 데이터프레임 생성
+#         df = pd.DataFrame(data["output2"])
+#         print(f"RSI 계산을 위한 데이터 프레임 생성 완료: {len(df)} 행")
+        
+#         # 가격 컬럼 동적 탐색
+#         price_columns = ['stck_prpr', 'ovrs_nmix_prpr', 'close', 'last']
+#         price_col = next((col for col in price_columns if col in df.columns), None)
+        
+#         if not price_col:
+#             print("가격 데이터 컬럼을 찾을 수 없습니다:", df.columns)
+#             return 50
+        
+#         # 가격 데이터 숫자 변환 및 결측값 처리
+#         df['price'] = pd.to_numeric(df[price_col], errors='coerce')
+#         df = df.dropna(subset=['price'])
+        
+#         # 날짜/시간 컬럼 처리
+#         if 'xymd' in df.columns and 'xhms' in df.columns:
+#             df['datetime'] = pd.to_datetime(df['xymd'] + df['xhms'], format='%Y%m%d%H%M%S')
+#         else:
+#             print("datetime 컬럼 생성 실패")
+#             return 50
+        
+#         # 데이터 정렬
+#         df = df.sort_values(by='datetime').reset_index(drop=True)
+        
+#         # 데이터 충분성 확인
+#         if len(df) < periods:
+#             print(f"데이터 부족 (필요: {periods}, 현재: {len(df)})")
+#             return 50
+        
+#         # RSI 계산 로직
+#         delta = df['price'].diff()
+#         gain = (delta.where(delta > 0, 0)).fillna(0)
+#         loss = (-delta.where(delta < 0, 0)).fillna(0)
+        
+#         avg_gain = gain.rolling(window=periods, min_periods=periods).mean()
+#         avg_loss = loss.rolling(window=periods, min_periods=periods).mean()
+        
+#         rs = avg_gain / avg_loss
+#         rsi = 100 - (100 / (1 + rs))
+        
+#         # 최신 RSI 값 추출 및 반올림
+#         latest_rsi = round(rsi.iloc[-1], 2)
+#         print(f"RSI 계산 완료: {latest_rsi}")
+#         return latest_rsi
+    
+#     except Exception as e:
+#         print(f"RSI 계산 중 오류 발생: {e}")
+#         return 50
 
 # 다중 심볼 RSI 조회 헬퍼 함수 (선택사항)
 def get_current_rsi(symbol, periods=14, nmin=30):
@@ -395,8 +478,9 @@ def main():
                 # 각 심볼에 대해 반복 처리
                 for symbol in SYMBOLS:
                     KST_time = datetime.now(timezone('Asia/Seoul'))
-                    send_message(f"=== RSI 체크 시작 ({symbol}) (미국: {NAS_time.strftime('%H:%M')}, 한국: {KST_time.strftime('%H:%M')}) ===", symbol)
-                    
+                    #send_message(f"=== RSI 체크 시작 ({symbol}) (미국: {NAS_time.strftime('%H:%M')}, 한국: {KST_time.strftime('%H:%M')}) ===", symbol)
+                    #메세지 줄이기
+
                     current_rsi = get_current_rsi(symbol)
                     send_message(f"현재 RSI: {current_rsi:.2f}", symbol)
                     
@@ -406,7 +490,7 @@ def main():
                         send_message(f"현재가 조회 실패", symbol)
                         continue
                     
-                    send_message(f"현재가: ${current_price}", symbol)
+                    #send_message(f"현재가: ${current_price}", symbol) #메세지 줄이기 
                     
                     # 매수 조건
                     if current_rsi <= 30:
@@ -416,7 +500,7 @@ def main():
                         cash_balance = get_balance(symbol)
                         if cash_balance > 0:
                             # 환율 조회
-                            exchange_rate = get_exchange_rate()
+                            #exchange_rate = get_exchange_rate()
                             usd_balance = cash_balance
                             
                             # 매수 가능 금액 계산
