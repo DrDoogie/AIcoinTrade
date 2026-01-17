@@ -1944,7 +1944,7 @@ def check_stop_loss(symbol, stop_loss_percent=None, max_retries=3):
 
 
 def main():
-    global ACCESS_TOKEN
+    global ACCESS_TOKEN, PARTIAL_PROFIT_TAKEN
     
     token_retry_count = 0
     max_token_retries = 5
@@ -2277,7 +2277,6 @@ def main():
                                                         # 거래 내역 추가
                                                         add_trade_record(symbol, 'sell', sell_qty, current_price)
                                                         # 전체 매도 시 부분 익절 추적 데이터 초기화 (다음 매수 시 다시 부분 익절 가능하도록)
-                                                        global PARTIAL_PROFIT_TAKEN
                                                         if symbol in PARTIAL_PROFIT_TAKEN:
                                                             del PARTIAL_PROFIT_TAKEN[symbol]
                                                             print(f"✅ {symbol} 전체 매도 완료 - 부분 익절 추적 데이터 초기화")
