@@ -286,11 +286,15 @@ def send_message(msg, symbol=None, level=MESSAGE_LEVEL_INFO):
     now = datetime.now()
     symbol_info = f"[{symbol}] " if symbol else ""
     
-    # 메시지 압축 (같은 내용 반복 방지)
-    if ENABLE_MESSAGE_COMPRESSION:
-        msg = compress_message(str(msg))
-    
-    full_message = f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {symbol_info}{str(msg)}"
+    # 빈 메시지는 압축하지 않음 (구분선, 빈 줄 등)
+    if not msg or msg.strip() == "":
+        # 빈 메시지는 그대로 전송 (구분선, 빈 줄용)
+        full_message = f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {symbol_info}"
+    else:
+        # 메시지 압축 (같은 내용 반복 방지)
+        if ENABLE_MESSAGE_COMPRESSION:
+            msg = compress_message(str(msg))
+        full_message = f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {symbol_info}{str(msg)}"
     
     # 반복 메시지 필터링
     msg_hash = hash(f"{symbol}_{msg}")
