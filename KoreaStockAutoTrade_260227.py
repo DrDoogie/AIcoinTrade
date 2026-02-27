@@ -40,7 +40,6 @@
 # 7. 로그 스팸 방지
 # 불필요한 로그 제거
 # 로그 스팸 방지를 위해 일부 로그 메시지 제거
-
 # 0920 추가 수정 사항
 # 1. 로그 스팸 방지
 # 로그 스팸 방지를 위해 일부 로그 메시지 제거
@@ -73,6 +72,10 @@
 # 260120 일일 요약 리포트 구분선 추가: 종목별 리포트 구분을 위해 별표(******) 구분선과 빈 줄 추가
 # 260124 RSI 계산 공식 수정: 첫 EMA 계산 인덱스 수정 (periods -> periods+1)
 # 260124 매수 조건 완화: 상승 추세에서도 매수 가능하도록 max_price_above_ma_percent 설정 (기본 2%, 테마주 3%)
+# 260227 1시간 단위 매매 조건 체크하고 Discord 메세지 발송하게 수정하고
+# 260227 원전기술 종목 추가함 
+
+
 
 #파트1
 
@@ -108,7 +111,7 @@ URL_BASE = config['URL_BASE']
 
 # 매매 대상 종목 리스트 (종목코드)
 #삼성전자, SK하이닉스, kodex200, PLUS K방산,,SOL 조선 top3, Tiger S&P, Tiger 차이나휴머노이드로봇
-SYMBOLS = ["005930","000660","069500", "449450","466920","360750","0053L0"]
+SYMBOLS = ["005930","000660","069500", "449450","466920","052690","360750","0053L0"]
 
 # 종목 코드와 종목명 매핑
 SYMBOL_NAMES = {
@@ -366,87 +369,87 @@ def collect_daily_summary_data(symbol, rsi_value, current_price, ma_value, buy_s
     trade_failure_reason: 거래 미진행 사유 ('insufficient_balance': 잔고 부족, 'condition_not_met': 조건 미충족, None: 정상)
     """
     global DAILY_SUMMARY_DATA
-    
     try:
         current_time = datetime.datetime.now(timezone('Asia/Seoul'))
-    time_str = current_time.strftime('%H:%M')
-    
-    if symbol not in DAILY_SUMMARY_DATA:
-        DAILY_SUMMARY_DATA[symbol] = {
-            'symbol': symbol,
-            'analysis_points': [],
-            'buy_signals': [],
-            'sell_signals': [],
-            'trades': [],
-            'trade_failures': [],  # 거래 실패 내역 추가
-            'rsi_range': {'min': 100, 'max': 0},
-            'price_range': {'min': float('inf'), 'max': 0},
-            'start_time': time_str,
-            'last_time': time_str
-        }
+        time_str = current_time.strftime('%H:%M')
+
+        # 심볼별 초기 데이터 구조 생성
+        if symbol not in DAILY_SUMMARY_DATA:
+            DAILY_SUMMARY_DATA[symbol] = {
+                'symbol': symbol,
+                'analysis_points': [],
+                'buy_signals': [],
+                'sell_signals': [],
+                'trades': [],
+                'trade_failures': [],  # 거래 실패 내역 추가
+                'rsi_range': {'min': 100, 'max': 0},
+                'price_range': {'min': float('inf'), 'max': 0},
+                'start_time': time_str,
+                'last_time': time_str
+            }
             symbol_name = get_symbol_name(symbol)
             log(f"📝 {symbol_name}({symbol}) 분석 데이터 초기화 완료")
-    
-    # 분석 포인트 추가
-    analysis_point = {
-        'time': time_str,
-        'rsi': rsi_value,
-        'current_price': current_price,
-        'ma_value': ma_value,
-        'buy_signal': buy_signal,
-        'sell_signal': sell_signal,
-        'buy_reason': buy_reason,
-        'sell_reason': sell_reason,
-        'trade_failure_reason': trade_failure_reason  # 거래 실패 사유 추가
-    }
-    
-    # 거래 실패 내역 기록 (매수 신호는 있지만 거래가 진행되지 않은 경우)
-    if buy_signal and trade_failure_reason:
-        DAILY_SUMMARY_DATA[symbol]['trade_failures'].append({
+
+        # 분석 포인트 추가
+        analysis_point = {
             'time': time_str,
-            'type': 'buy',
-            'reason': trade_failure_reason,
-            'reason_detail': buy_reason if trade_failure_reason == 'condition_not_met' else '잔고 부족으로 매수 불가',
-            'price': current_price,
-            'rsi': rsi_value
-        })
-    
-    DAILY_SUMMARY_DATA[symbol]['analysis_points'].append(analysis_point)
-    DAILY_SUMMARY_DATA[symbol]['last_time'] = time_str
-    
-    # RSI 범위 업데이트
-    if rsi_value < DAILY_SUMMARY_DATA[symbol]['rsi_range']['min']:
-        DAILY_SUMMARY_DATA[symbol]['rsi_range']['min'] = rsi_value
-    if rsi_value > DAILY_SUMMARY_DATA[symbol]['rsi_range']['max']:
-        DAILY_SUMMARY_DATA[symbol]['rsi_range']['max'] = rsi_value
-    
-    # 가격 범위 업데이트
-    if current_price < DAILY_SUMMARY_DATA[symbol]['price_range']['min']:
-        DAILY_SUMMARY_DATA[symbol]['price_range']['min'] = current_price
-    if current_price > DAILY_SUMMARY_DATA[symbol]['price_range']['max']:
-        DAILY_SUMMARY_DATA[symbol]['price_range']['max'] = current_price
-    
-    # 매수/매도 신호 기록
-    if buy_signal:
-        DAILY_SUMMARY_DATA[symbol]['buy_signals'].append({
-            'time': time_str,
-            'reason': buy_reason,
-            'price': current_price,
-            'rsi': rsi_value
-        })
-    
-    if sell_signal:
-        DAILY_SUMMARY_DATA[symbol]['sell_signals'].append({
-            'time': time_str,
-            'reason': sell_reason,
-            'price': current_price,
-            'rsi': rsi_value
-        })
-        
+            'rsi': rsi_value,
+            'current_price': current_price,
+            'ma_value': ma_value,
+            'buy_signal': buy_signal,
+            'sell_signal': sell_signal,
+            'buy_reason': buy_reason,
+            'sell_reason': sell_reason,
+            'trade_failure_reason': trade_failure_reason  # 거래 실패 사유 추가
+        }
+
+        # 거래 실패 내역 기록 (매수 신호는 있지만 거래가 진행되지 않은 경우)
+        if buy_signal and trade_failure_reason:
+            DAILY_SUMMARY_DATA[symbol]['trade_failures'].append({
+                'time': time_str,
+                'type': 'buy',
+                'reason': trade_failure_reason,
+                'reason_detail': buy_reason if trade_failure_reason == 'condition_not_met' else '잔고 부족으로 매수 불가',
+                'price': current_price,
+                'rsi': rsi_value
+            })
+
+        DAILY_SUMMARY_DATA[symbol]['analysis_points'].append(analysis_point)
+        DAILY_SUMMARY_DATA[symbol]['last_time'] = time_str
+
+        # RSI 범위 업데이트
+        if rsi_value < DAILY_SUMMARY_DATA[symbol]['rsi_range']['min']:
+            DAILY_SUMMARY_DATA[symbol]['rsi_range']['min'] = rsi_value
+        if rsi_value > DAILY_SUMMARY_DATA[symbol]['rsi_range']['max']:
+            DAILY_SUMMARY_DATA[symbol]['rsi_range']['max'] = rsi_value
+
+        # 가격 범위 업데이트
+        if current_price < DAILY_SUMMARY_DATA[symbol]['price_range']['min']:
+            DAILY_SUMMARY_DATA[symbol]['price_range']['min'] = current_price
+        if current_price > DAILY_SUMMARY_DATA[symbol]['price_range']['max']:
+            DAILY_SUMMARY_DATA[symbol]['price_range']['max'] = current_price
+
+        # 매수/매도 신호 기록
+        if buy_signal:
+            DAILY_SUMMARY_DATA[symbol]['buy_signals'].append({
+                'time': time_str,
+                'reason': buy_reason,
+                'price': current_price,
+                'rsi': rsi_value
+            })
+
+        if sell_signal:
+            DAILY_SUMMARY_DATA[symbol]['sell_signals'].append({
+                'time': time_str,
+                'reason': sell_reason,
+                'price': current_price,
+                'rsi': rsi_value
+            })
+
         # 디버깅 로그 (분석 포인트가 추가될 때마다)
         symbol_name = get_symbol_name(symbol)
         log(f"✅ {symbol_name}({symbol}) 분석 데이터 수집 완료: 분석포인트 {len(DAILY_SUMMARY_DATA[symbol]['analysis_points'])}개")
-        
+
     except Exception as e:
         symbol_name = get_symbol_name(symbol)
         log(f"❌ {symbol_name}({symbol}) 분석 데이터 수집 중 오류: {str(e)}")
